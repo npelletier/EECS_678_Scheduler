@@ -4,18 +4,22 @@
 #ifndef LIBPRIQUEUE_H_
 #define LIBPRIQUEUE_H_
 
-typedef struct _node_t
+typedef int (*comparer) (const void *a, const void *b);
+
+typedef struct node_t node_t;
+
+struct node_t
 {
   void* m_entry;
-  struct node_t m_next;
-} node_t;
+  node_t* m_next;
+};
 
 /**
   Priqueue Data Structure
 */
 typedef struct _priqueue_t
 {
-  node_t m_front;
+  node_t* m_front;
   int m_size;
   comparer comp;
 } priqueue_t;
