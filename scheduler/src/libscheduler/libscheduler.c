@@ -27,9 +27,7 @@ priqueue_t* queue;
 **                                          */
 int FCFS_comp(const void* left,const void* right)
 {
-  job_t* left_job = (job_t*)left;
-  job_t* right_job = (job_t*)right;
-  return left_job->arrival_time - right_job->arrival_time;
+  return 1;
 }
 int SJF_comp(const void* left, const void* right)
 {
@@ -40,7 +38,7 @@ int SJF_comp(const void* left, const void* right)
   if(l == r) //same run time
   {
     //use FCFS
-    return left_job->arrival_time - right_job->arrival_time);
+    return (left_job->arrival_time - right_job->arrival_time);
   }
   return l - r;//not equal
 }
@@ -53,7 +51,7 @@ int PRI_comp(const void* left, const void* right)
   if(l == r)
   {
     //use FCFS
-    return left_job->arrival_time - right_job->arrival_time;
+    return (left_job->arrival_time - right_job->arrival_time);
   }else
   {
     return l - r;
@@ -79,16 +77,16 @@ void scheduler_start_up(int cores, scheme_t scheme)
   **                               */
   m_waiting_time = 0.0;
   m_turnaround_time = 0.0;
-  m_response_time = 0.0
+  m_response_time = 0.0;
   num_jobs = 0;
 
   num_cores = cores;
   //this array will be filled with 0 for a free core, 1 for a busy core
-  avail_cores = malloc(sizeof(int) * cores);
-  memset(avail_cores,0,sizeof avail_cores);
+  avail_cores = malloc(cores * sizeof(int));
+  memset(avail_cores,0,sizeof(avail_cores));
   //set comparison scheme
   scheduling_scheme = scheme;
-  switch(scheme)
+  switch(scheduling_scheme)
   {
     case FCFS:
     {
@@ -157,6 +155,8 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
   to_add->run_time = running_time;
   to_add->arrival_time = time;
   to_add->priority = priority;
+  to_add->start_time = -1;
+  to_add->core_id = -1;
   //find the first available core
   int to_return = -1;
   int i = 0;
@@ -172,10 +172,14 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
   if(i != num_cores)
   {
     avail_cores[i] = 1;
+    if(scheduling_scheme == PSJF)
+    {
+      last_time_checked_PSJF = time;
+    }
   }else
   //i == num_cores => there is no free core, we need to check for preemption
   {
-    switch(scheme)
+    switch(scheduling_scheme)
     {
       case PSJF:
       {
@@ -189,22 +193,36 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
         int core_of_longest_run_time;
         for(j = 0; j < num_cores; j++)
         {
-          job_t* curr_check = (job_t*)priqueue_at(queue,i);
+          job_t* curr_check = (job_t*)priqueue_at(queue,j);
           //update each running job's remaining runtime
           curr_check->run_time -= time_diff;
           if(curr_check->run_time > longest_run_time)
           {
             longest_run_time = curr_check->run_time;
-            core_of_longest_run_time = j;
+            core_of_longest_run_time = curr_check->core_id;
           }
         }
         last_time_checked_PSJF = time;
-        to_return = j;
+        to_return = core_of_longest_run_time;
+
         break;
       }
       case PPRI:
       {
-
+        int j;
+        job_t* curr_check = (job_t*)priqueue_peek(queue);
+        int lowest_priority = curr_check->priority;
+        int core_of_lowest_priority = -1;
+        for(j = 0; j < num_cores; j++)
+        {
+          curr_check = (job_t*) priqueue_at(queue,j);
+          if (curr_check->priority > lowest_priority)
+          {
+            lowest_priority = curr_check->priority;
+            core_of_lowest_priority = curr_check->core_id;
+          }
+        }
+        to_return = core_of_lowest_priority;
         break;
       }
       default:
@@ -213,7 +231,15 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
       }
     }
   }
-  //since there is no preemption, we don't need to return any core ids
+  //update the core id of the new node
+  to_add->core_id = to_return;
+  //if the node is assigned to a core, set its start time to be current time
+  if(to_return != -1)
+  {
+    to_add->start_time = time;
+  }
+  //add to queue
+  num_jobs++;
   priqueue_offer(queue,to_add);
 	return to_return;
 }
@@ -235,7 +261,29 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
  */
 int scheduler_job_finished(int core_id, int job_number, int time)
 {
-	return -1;
+  int i = 0, j = 0;
+  int removal_index = -1;
+  int ret_job_id;
+  job_t* temp;
+  for(;i < num_cores;i++)
+  {
+    temp = priqueue_at(queue,i);
+    if(temp->core_id == core_id)
+    {
+      priqueue_remove_at(queue,i);
+      for(;j<priqueue_size(queue);j++)
+      {
+        temp = priqueue_at(queue,j);
+        if(temp->core_id == -1)
+        {
+          temp->core_id = core_id;
+          //here, update waiting time somehow temp->
+          ret_job_id = temp->job_id;
+        }
+      }
+    }
+  }
+	return ret_job_id;
 }
 
 
@@ -267,6 +315,7 @@ int scheduler_quantum_expired(int core_id, int time)
  */
 float scheduler_average_waiting_time()
 {
+  //total waiting
 	return 0.0;
 }
 
@@ -280,7 +329,7 @@ float scheduler_average_waiting_time()
  */
 float scheduler_average_turnaround_time()
 {
-
+  //arrived to finished
 	return 0.0;
 }
 
@@ -294,6 +343,7 @@ float scheduler_average_turnaround_time()
  */
 float scheduler_average_response_time()
 {
+  //arrived to started
 	return 0.0;
 }
 
