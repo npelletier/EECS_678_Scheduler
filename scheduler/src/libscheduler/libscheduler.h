@@ -9,6 +9,12 @@
 */
 typedef enum {FCFS = 0, SJF, PSJF, PRI, PPRI, RR} scheme_t;
 
+float m_waiting_time, m_turnaround_time, m_response_time;
+int num_jobs;
+int* avail_cores;//will be an array with the status (0/1) of each core
+int num_cores;
+scheme_t scheduling_scheme;
+
 void  scheduler_start_up               (int cores, scheme_t scheme);
 int   scheduler_new_job                (int job_number, int time, int running_time, int priority);
 int   scheduler_job_finished           (int core_id, int job_number, int time);

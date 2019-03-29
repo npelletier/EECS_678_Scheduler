@@ -16,17 +16,19 @@
 */
 typedef struct _job_t
 {
-  int job_id, arrival_time, run_time, priority, start_time, core_id;
+  int job_id, arrival_time, original_run_time, run_time, priority, start_time, core_id;
 } job_t;
 
+int last_time_checked_PSJF;
 priqueue_t* queue;
-int* avail_cores;//will be an array with the status (0/1) of each core
 
 /*                                          **
 **------------COMPARISON FUNCTIONS----------**
 **                                          */
 int FCFS_comp(const void* left,const void* right)
 {
+  job_t* left_job = (job_t*)left;
+  job_t* right_job = (job_t*)right;
   return left_job->arrival_time - right_job->arrival_time;
 }
 int SJF_comp(const void* left, const void* right)
@@ -72,9 +74,20 @@ int PRI_comp(const void* left, const void* right)
 */
 void scheduler_start_up(int cores, scheme_t scheme)
 {
+  /*                               **
+  *---INITIALIZE GLOBAL VARIABLES---*
+  **                               */
+  m_waiting_time = 0.0;
+  m_turnaround_time = 0.0;
+  m_response_time = 0.0
+  num_jobs = 0;
+
+  num_cores = cores;
   //this array will be filled with 0 for a free core, 1 for a busy core
   avail_cores = malloc(sizeof(int) * cores);
+  memset(avail_cores,0,sizeof avail_cores);
   //set comparison scheme
+  scheduling_scheme = scheme;
   switch(scheme)
   {
     case FCFS:
@@ -138,7 +151,71 @@ void scheduler_start_up(int cores, scheme_t scheme)
  */
 int scheduler_new_job(int job_number, int time, int running_time, int priority)
 {
-	return -1;
+  job_t* to_add = malloc(sizeof(job_t));
+  to_add->job_id = job_number;
+  to_add->original_run_time = running_time;
+  to_add->run_time = running_time;
+  to_add->arrival_time = time;
+  to_add->priority = priority;
+  //find the first available core
+  int to_return = -1;
+  int i = 0;
+  while(i < num_cores)
+  {
+    if(avail_cores[i] == 0)
+    {
+      break;
+    }
+    i++;
+  }
+  //mark the chosen core as in use
+  if(i != num_cores)
+  {
+    avail_cores[i] = 1;
+  }else
+  //i == num_cores => there is no free core, we need to check for preemption
+  {
+    switch(scheme)
+    {
+      case PSJF:
+      {
+        //we need to know how long since we added the last job
+        int time_diff = time - last_time_checked_PSJF;
+        int j;
+        //need to find the longest remaining time of jobs on cores
+        int longest_run_time = -1;
+        //this is the core to be run on
+        //also the index of the job in the queue
+        int core_of_longest_run_time;
+        for(j = 0; j < num_cores; j++)
+        {
+          job_t* curr_check = (job_t*)priqueue_at(queue,i);
+          //update each running job's remaining runtime
+          curr_check->run_time -= time_diff;
+          if(curr_check->run_time > longest_run_time)
+          {
+            longest_run_time = curr_check->run_time;
+            core_of_longest_run_time = j;
+          }
+        }
+        last_time_checked_PSJF = time;
+        to_return = j;
+        break;
+      }
+      case PPRI:
+      {
+
+        break;
+      }
+      default:
+      {
+        break;
+      }
+    }
+  }
+  //since there is no preemption, we don't need to return any core ids
+  priqueue_offer(queue,to_add);
+	return to_return;
 }
 
 
@@ -203,6 +280,7 @@ float scheduler_average_waiting_time()
  */
 float scheduler_average_turnaround_time()
 {
+
 	return 0.0;
 }
 
