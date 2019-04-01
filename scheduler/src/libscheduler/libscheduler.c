@@ -192,7 +192,6 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
       {
         //we need to know how long since we added the last job
         int time_diff = time - last_time_checked_PSJF;
-        int j;
         //need to find the longest remaining time of jobs on cores
         int longest_run_time = -1;
         //this is the core to be run on
@@ -200,14 +199,23 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
         int core_of_longest_run_time = -1;
         job_t* curr_check;
         int index;
+        //update run times
+        for(int p = 0; p < priqueue_size(&queue);p++)
+        {
+          curr_check = (job_t*)priqueue_at(&queue,p);
+          if(curr_check->core_id != -1)
+          {
+            if(!(curr_check->start_time == time))
+            {
+              curr_check->run_time -= time_diff;
+            }
+          }
+        }
+        int j;
         for(j = 0; j < num_cores; j++)
         {
           curr_check = (job_t*)priqueue_at(&queue,j);
-          //update each running job's remaining runtime
-          if(!(curr_check->response_time == time - curr_check->arrival_time))
-          {
-            curr_check->run_time -= time_diff;
-          }
+
           if(curr_check->run_time > longest_run_time)
           {
             longest_run_time = curr_check->run_time;
@@ -220,6 +228,14 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
           to_return = core_of_longest_run_time;
           curr_check = (job_t*)priqueue_at(&queue,index);
           curr_check->core_id = -1;
+          if(curr_check->start_time == time)
+          {
+            curr_check->start_time = -1;
+            m_response_time -= (time - curr_check->arrival_time);
+          }else
+          {
+            curr_check->start_time = time;
+          }
         }
         last_time_checked_PSJF = time;
         break;
@@ -235,7 +251,6 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
           curr_check = (job_t*) priqueue_at(&queue,j);
           if (curr_check->priority > lowest_priority)
           {
-
             lowest_priority = curr_check->priority;
             core_of_lowest_priority = curr_check->core_id;
           }
@@ -245,6 +260,7 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
           core_of_lowest_priority = curr_check->core_id;
           to_return = core_of_lowest_priority;
           curr_check->core_id = -1;
+          curr_check->start_time = time;
         }
         break;
       }
@@ -316,7 +332,6 @@ int scheduler_job_finished(int core_id, int job_number, int time)
           //here, update waiting time somehow temp->
           return_job_id = temp->job_id;
           temp->start_time=time;
-          temp->response_time = time - temp->arrival_time;
           return return_job_id;
         }
       }
@@ -448,6 +463,6 @@ void scheduler_show_queue()
   for(int i = 0; i < priqueue_size(&queue);i++)
   {
     temp = (job_t*)priqueue_at(&queue,i);
-    printf("%d(%d) ",temp->job_id,temp->run_time);
+    printf("%d(%d) ",temp->job_id,temp->priority);
   }
 }
