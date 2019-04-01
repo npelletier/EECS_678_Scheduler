@@ -214,19 +214,29 @@ void *priqueue_remove_at(priqueue_t *q, int index)
 	node_t* temp = q->m_front;
 	node_t* prev = NULL;
 	void* entry;
-	for(int i = 0; i < q->m_size; i++)
+	if (index == 0)
 	{
-		if(i==index-1)
+		q->m_front = temp->m_next;
+		entry = temp->m_entry;
+		free(temp);
+		q->m_size--;
+		return entry;
+	}else
+	{
+		for(int i = 0; i < q->m_size; i++)
 		{
-			prev = temp;
+			if(i==index-1)
+			{
+				prev = temp;
+				temp = temp->m_next;
+				prev->m_next = temp->m_next;
+				entry = temp->m_entry;
+				free(temp);
+				q->m_size--;
+				return entry;
+			}
 			temp = temp->m_next;
-			prev->m_next = temp->m_next;
-			entry = temp->m_entry;
-			free(temp);
-			q->m_size--;
-			return entry;
 		}
-		temp = temp->m_next;
 	}
 	return NULL;
 }
