@@ -309,7 +309,28 @@ int scheduler_job_finished(int core_id, int job_number, int time)
  */
 int scheduler_quantum_expired(int core_id, int time)
 {
-	return -1;
+  job_t* temp;
+for(int i = 0; i<queue->priqueue_size(queue); i++)
+{
+  temp = queue->priqueue_at(queue, i);
+  if(temp->core_id == core_id)
+  {
+    queue->priqueue_remove_at(queue, i);
+    temp->core_id=-1;
+    queue->priqueue_offer(queue, temp);
+    for(int j = 0; j<queue->priqueue_size(); j++)
+    {
+      temp = queue->priqueue_at(queue, i);
+      if(temp->core_id==-1)
+      {
+        temp->core_id=core_id;
+        return temp->job_id;
+      }
+    }
+  }
+}
+avail_cores[core_id]=0;
+return -1;
 }
 
 
