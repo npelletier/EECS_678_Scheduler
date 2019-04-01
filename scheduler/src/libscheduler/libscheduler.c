@@ -282,6 +282,7 @@ int scheduler_job_finished(int core_id, int job_number, int time)
     temp = priqueue_at(&queue,i);
     if(temp->core_id == core_id)
     {
+      m_turnaround_time = m_turnaround_time + time - temp->arrival_time;
       priqueue_remove_at(&queue,i);
       for(;j<priqueue_size(&queue);j++)
       {
@@ -290,8 +291,18 @@ int scheduler_job_finished(int core_id, int job_number, int time)
         {
           avail_cores[core_id] = 1;
           temp->core_id = core_id;
+          if(temp->start_time==-1)
+          {
+            m_waiting_time = m_waiting_time + time - temp->arrival_time;
+            m_response_time = m_response_time + time - temp->arrival_time;
+          }
+          else
+          {
+            m_waiting_time = m_waiting_time + time - temp->start_time;
+          }
           //here, update waiting time somehow temp->
           return_job_id = temp->job_id;
+          temp->start_time=time;
           return return_job_id;
         }
       }
@@ -317,29 +328,6 @@ int scheduler_job_finished(int core_id, int job_number, int time)
 int scheduler_quantum_expired(int core_id, int time)
 {
   job_t* temp;
-<<<<<<< Updated upstream
-for(int i = 0; i<queue->priqueue_size(queue); i++)
-{
-  temp = queue->priqueue_at(queue, i);
-  if(temp->core_id == core_id)
-  {
-    queue->priqueue_remove_at(queue, i);
-    temp->core_id=-1;
-    queue->priqueue_offer(queue, temp);
-    for(int j = 0; j<queue->priqueue_size(); j++)
-    {
-      temp = queue->priqueue_at(queue, i);
-      if(temp->core_id==-1)
-      {
-        temp->core_id=core_id;
-        return temp->job_id;
-      }
-    }
-  }
-}
-avail_cores[core_id]=0;
-return -1;
-=======
   for(int i = 0; i<priqueue_size(&queue); i++)
   {
     temp = priqueue_at(&queue, i);
@@ -347,12 +335,23 @@ return -1;
     {
       priqueue_remove_at(&queue, i);
       temp->core_id=-1;
+      temp->start_time = time;
       priqueue_offer(&queue, temp);
       for(int j = 0; j<priqueue_size(&queue); j++)
       {
         temp = priqueue_at(&queue, j);
         if(temp->core_id==-1)
         {
+          if(temp->start_time==-1)
+          {
+            m_waiting_time = m_waiting_time + time - temp->arrival_time;
+            m_response_time = m_response_time + time - temp->arrival_time;
+          }
+          else
+          {
+            m_waiting_time = m_waiting_time + time - temp->start_time;
+          }
+          temp->start_time=time;
           temp->core_id=core_id;
           return temp->job_id;
         }
@@ -361,7 +360,7 @@ return -1;
   }
   avail_cores[core_id]=0;
   return -1;
->>>>>>> Stashed changes
+
 }
 
 /**
@@ -374,7 +373,7 @@ return -1;
 float scheduler_average_waiting_time()
 {
   //total waiting
-	return 0.0;
+  return m_waiting_time/num_jobs;
 }
 
 
@@ -388,7 +387,7 @@ float scheduler_average_waiting_time()
 float scheduler_average_turnaround_time()
 {
   //arrived to finished
-	return 0.0;
+  return m_turnaround_time/num_jobs;
 }
 
 
@@ -402,7 +401,7 @@ float scheduler_average_turnaround_time()
 float scheduler_average_response_time()
 {
   //arrived to started
-	return 0.0;
+  return m_response_time/num_jobs;
 }
 
 
