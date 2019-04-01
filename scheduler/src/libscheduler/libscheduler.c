@@ -16,7 +16,7 @@
 */
 typedef struct _job_t
 {
-  int job_id, arrival_time, original_run_time, run_time, priority, start_time, core_id;
+  int job_id, response_time, arrival_time, original_run_time, run_time, priority, start_time, core_id;
 } job_t;
 
 int last_time_checked_PSJF;
@@ -38,9 +38,9 @@ int SJF_comp(const void* left, const void* right)
   if(l == r) //same run time
   {
     //use FCFS
-    return (left_job->arrival_time - right_job->arrival_time);
+    return -1;
   }
-  return l - r;//not equal
+  return l-r;//not equal
 }
 int PRI_comp(const void* left, const void* right)
 {
@@ -51,7 +51,7 @@ int PRI_comp(const void* left, const void* right)
   if(l == r)
   {
     //use FCFS
-    return (left_job->arrival_time - right_job->arrival_time);
+    return -1;
   }else
   {
     return l - r;
@@ -163,6 +163,7 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
   to_add->priority = priority;
   to_add->start_time = -1;
   to_add->core_id = -1;
+  to_add->response_time = 0;
   //find the first available core
   int to_return = -1;
   int i = 0;
@@ -196,21 +197,31 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
         int longest_run_time = -1;
         //this is the core to be run on
         //also the index of the job in the queue
-        int core_of_longest_run_time;
+        int core_of_longest_run_time = -1;
+        job_t* curr_check;
+        int index;
         for(j = 0; j < num_cores; j++)
         {
-          job_t* curr_check = (job_t*)priqueue_at(&queue,j);
+          curr_check = (job_t*)priqueue_at(&queue,j);
           //update each running job's remaining runtime
-          curr_check->run_time -= time_diff;
+          if(!(curr_check->response_time == time - curr_check->arrival_time))
+          {
+            curr_check->run_time -= time_diff;
+          }
           if(curr_check->run_time > longest_run_time)
           {
             longest_run_time = curr_check->run_time;
             core_of_longest_run_time = curr_check->core_id;
+            index = j;
           }
         }
+        if(running_time < longest_run_time)
+        {
+          to_return = core_of_longest_run_time;
+          curr_check = (job_t*)priqueue_at(&queue,index);
+          curr_check->core_id = -1;
+        }
         last_time_checked_PSJF = time;
-        to_return = core_of_longest_run_time;
-
         break;
       }
       case PPRI:
@@ -224,12 +235,14 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
           curr_check = (job_t*) priqueue_at(&queue,j);
           if (curr_check->priority > lowest_priority)
           {
+
             lowest_priority = curr_check->priority;
             core_of_lowest_priority = curr_check->core_id;
           }
         }
         if(priority < lowest_priority)
         {
+          core_of_lowest_priority = curr_check->core_id;
           to_return = core_of_lowest_priority;
           curr_check->core_id = -1;
         }
@@ -303,6 +316,7 @@ int scheduler_job_finished(int core_id, int job_number, int time)
           //here, update waiting time somehow temp->
           return_job_id = temp->job_id;
           temp->start_time=time;
+          temp->response_time = time - temp->arrival_time;
           return return_job_id;
         }
       }
@@ -434,6 +448,6 @@ void scheduler_show_queue()
   for(int i = 0; i < priqueue_size(&queue);i++)
   {
     temp = (job_t*)priqueue_at(&queue,i);
-    printf("%d(%d) ",temp->job_id,temp->priority);
+    printf("%d(%d) ",temp->job_id,temp->run_time);
   }
 }
