@@ -27,7 +27,7 @@ priqueue_t queue;
 **                                          */
 int FCFS_comp(const void* left,const void* right)
 {
-  return 1;
+  return -1;
 }
 int SJF_comp(const void* left, const void* right)
 {
@@ -83,7 +83,10 @@ void scheduler_start_up(int cores, scheme_t scheme)
   num_cores = cores;
   //this array will be filled with 0 for a free core, 1 for a busy core
   avail_cores = malloc((sizeof(int)) * cores);
-  memset(avail_cores,0,sizeof(*avail_cores) );
+  for(int i = 0; i < num_cores; i++)
+  {
+    avail_cores[i] = 0;
+  }
   //set comparison scheme
   scheduling_scheme = scheme;
 
@@ -172,7 +175,7 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
     }
   }
   //mark the chosen core as in use
-  if(i != num_cores)
+  if(i < num_cores)
   {
     avail_cores[i] = 1;
     if(scheduling_scheme == PSJF)
@@ -215,7 +218,7 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
         int j;
         job_t* curr_check = (job_t*)priqueue_peek(&queue);
         int lowest_priority = curr_check->priority;
-        int core_of_lowest_priority = -1;
+        int core_of_lowest_priority = curr_check->core_id;
         for(j = 0; j < num_cores; j++)
         {
           curr_check = (job_t*) priqueue_at(&queue,j);
@@ -225,7 +228,11 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
             core_of_lowest_priority = curr_check->core_id;
           }
         }
-        to_return = core_of_lowest_priority;
+        if(priority < lowest_priority)
+        {
+          to_return = core_of_lowest_priority;
+          curr_check->core_id = -1;
+        }
         break;
       }
       default:
@@ -281,11 +288,11 @@ int scheduler_job_finished(int core_id, int job_number, int time)
         temp = priqueue_at(&queue,j);
         if(temp->core_id == -1)
         {
-
           avail_cores[core_id] = 1;
           temp->core_id = core_id;
           //here, update waiting time somehow temp->
           return_job_id = temp->job_id;
+          return return_job_id;
         }
       }
     }
@@ -310,6 +317,7 @@ int scheduler_job_finished(int core_id, int job_number, int time)
 int scheduler_quantum_expired(int core_id, int time)
 {
   job_t* temp;
+<<<<<<< Updated upstream
 for(int i = 0; i<queue->priqueue_size(queue); i++)
 {
   temp = queue->priqueue_at(queue, i);
@@ -331,8 +339,30 @@ for(int i = 0; i<queue->priqueue_size(queue); i++)
 }
 avail_cores[core_id]=0;
 return -1;
+=======
+  for(int i = 0; i<priqueue_size(&queue); i++)
+  {
+    temp = priqueue_at(&queue, i);
+    if(temp->core_id == core_id)
+    {
+      priqueue_remove_at(&queue, i);
+      temp->core_id=-1;
+      priqueue_offer(&queue, temp);
+      for(int j = 0; j<priqueue_size(&queue); j++)
+      {
+        temp = priqueue_at(&queue, j);
+        if(temp->core_id==-1)
+        {
+          temp->core_id=core_id;
+          return temp->job_id;
+        }
+      }
+    }
+  }
+  avail_cores[core_id]=0;
+  return -1;
+>>>>>>> Stashed changes
 }
-
 
 /**
   Returns the average waiting time of all jobs scheduled by your scheduler.
@@ -401,5 +431,10 @@ void scheduler_clean_up()
  */
 void scheduler_show_queue()
 {
-
+  job_t* temp;
+  for(int i = 0; i < priqueue_size(&queue);i++)
+  {
+    temp = (job_t*)priqueue_at(&queue,i);
+    printf("%d(%d) ",temp->job_id,temp->priority);
+  }
 }
