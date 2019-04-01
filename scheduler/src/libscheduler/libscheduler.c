@@ -16,7 +16,7 @@
 */
 typedef struct _job_t
 {
-  int job_id, response_time, arrival_time, original_run_time, run_time, priority, start_time, core_id;
+  int job_id, waiting_time, original_start_time, last_queue_time, response_time, arrival_time, original_run_time, run_time, priority, last_start_time, core_id;
 } job_t;
 
 int last_time_checked_PSJF;
@@ -161,7 +161,9 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
   to_add->run_time = running_time;
   to_add->arrival_time = time;
   to_add->priority = priority;
-  to_add->start_time = -1;
+  to_add->original_start_time = -1;
+  to_add->last_start_time = -1;
+  to_add->last_queue_time = -1;
   to_add->core_id = -1;
   to_add->response_time = 0;
   //find the first available core
@@ -205,7 +207,7 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
           curr_check = (job_t*)priqueue_at(&queue,p);
           if(curr_check->core_id != -1)
           {
-            if(!(curr_check->start_time == time))
+            if(!(curr_check->original_start_time == time || curr_check->last_start_time == time))
             {
               curr_check->run_time -= time_diff;
             }
@@ -228,13 +230,18 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
           to_return = core_of_longest_run_time;
           curr_check = (job_t*)priqueue_at(&queue,index);
           curr_check->core_id = -1;
-          if(curr_check->start_time == time)
+          if(curr_check->original_start_time == time)
           {
-            curr_check->start_time = -1;
-            m_response_time -= (time - curr_check->arrival_time);
-          }else
+            curr_check->original_start_time = -1;
+            curr_check->last_start_time = -1;
+          }
+          else if(curr_check->last_start_time == time)
           {
-            curr_check->start_time = time;
+
+          }
+          else
+          {
+            curr_check->last_queue_time = time;
           }
         }
         last_time_checked_PSJF = time;
@@ -260,7 +267,19 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
           core_of_lowest_priority = curr_check->core_id;
           to_return = core_of_lowest_priority;
           curr_check->core_id = -1;
-          curr_check->start_time = time;
+          if(curr_check->original_start_time == time)
+          {
+            curr_check->original_start_time = -1;
+            curr_check->last_start_time = -1;
+          }
+          else if(curr_check->last_start_time == time)
+          {
+
+          }
+          else
+          {
+            curr_check->last_queue_time = time;
+          }
         }
         break;
       }
@@ -275,7 +294,8 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
   //if the job is assigned to a core, set its start time to be current time
   if(to_return != -1)
   {
-    to_add->start_time = time;
+    to_add->original_start_time = time;
+    to_add->last_start_time = time;
   }
   //add to queue
   num_jobs++;
@@ -312,6 +332,8 @@ int scheduler_job_finished(int core_id, int job_number, int time)
     if(temp->core_id == core_id)
     {
       m_turnaround_time = m_turnaround_time + time - temp->arrival_time;
+      m_response_time += temp->original_start_time - temp->arrival_time;
+      m_waiting_time += time - temp->original_run_time - temp->arrival_time;
       priqueue_remove_at(&queue,i);
       for(;j<priqueue_size(&queue);j++)
       {
@@ -320,18 +342,18 @@ int scheduler_job_finished(int core_id, int job_number, int time)
         {
           avail_cores[core_id] = 1;
           temp->core_id = core_id;
-          if(temp->start_time==-1)
+          if(temp->original_start_time==-1)
           {
-            m_waiting_time = m_waiting_time + time - temp->arrival_time;
-            m_response_time = m_response_time + time - temp->arrival_time;
+            // m_waiting_time = m_waiting_time + time - temp->arrival_time;
+            temp->original_start_time=time;
           }
           else
           {
-            m_waiting_time = m_waiting_time + time - temp->start_time;
+            // m_waiting_time = m_waiting_time + time - temp->last_queue_time;
           }
           //here, update waiting time somehow temp->
           return_job_id = temp->job_id;
-          temp->start_time=time;
+          temp->last_start_time=time;
           return return_job_id;
         }
       }
@@ -364,23 +386,23 @@ int scheduler_quantum_expired(int core_id, int time)
     {
       priqueue_remove_at(&queue, i);
       temp->core_id=-1;
-      temp->start_time = time;
+      temp->last_queue_time = time;
       priqueue_offer(&queue, temp);
       for(int j = 0; j<priqueue_size(&queue); j++)
       {
         temp = priqueue_at(&queue, j);
         if(temp->core_id==-1)
         {
-          if(temp->start_time==-1)
+          if(temp->original_start_time==-1)
           {
-            m_waiting_time = m_waiting_time + time - temp->arrival_time;
-            m_response_time = m_response_time + time - temp->arrival_time;
+            // m_waiting_time = m_waiting_time + time - temp->arrival_time;
+            temp->original_start_time=time;
           }
           else
           {
-            m_waiting_time = m_waiting_time + time - temp->start_time;
+            // m_waiting_time = m_waiting_time + time - temp->last_queue_time;
           }
-          temp->start_time=time;
+          temp->last_start_time=time;
           temp->core_id=core_id;
           return temp->job_id;
         }
